@@ -15,8 +15,9 @@ class Conv2D(Layer):
         # MODIFICAR: Añadir nuevo if-else para otros algoritmos de convolución
         if conv_algo == 0:
             self.mode = 'direct' 
+        elif conv_algo == 1:
+            self.mode = 'im2col'
         else:
-            print(f"Algoritmo {conv_algo} no soportado aún")
             self.mode = 'direct' 
 
         fan_in = in_channels * kernel_size * kernel_size
@@ -60,8 +61,10 @@ class Conv2D(Layer):
         # PISTA: Usar estos if-else si implementas más algoritmos de convolución
         if self.mode == 'direct':
             return self._forward_direct(input)
+        elif self.mode == 'im2col':   # ← añadir esto
+            return self._forward_im2col(input) 
         else:
-            raise ValueError("Mode must be 'direct")
+            raise ValueError("Mode must be 'direct' or 'im2col'")
 
     def backward(self, grad_output, learning_rate):
         # ESTO NO ES NECESARIO YA QUE NO VAIS A HACER BACKPROPAGATION
@@ -74,7 +77,7 @@ class Conv2D(Layer):
 
     def _forward_direct(self, input):
         batch_size, _, in_h, in_w = input.shape
-        k_h, k_w = self.kernel_size, self.kernel_size
+        
 
         if self.padding > 0:
             input = np.pad(input,
@@ -97,6 +100,53 @@ class Conv2D(Layer):
                 output[b, out_c] += self.biases[out_c]
 
         return output
+    
+    # ----- Generado con IA
+    # Función auxiliar: solo convierte input en matriz de parches
+    def _im2col(self, input_padded, out_h, out_w):
+        B, C, H, W = input_padded.shape
+        k_h = k_w = self.kernel_size
+        col = np.zeros((B, C * k_h * k_w, out_h * out_w), dtype=np.float32)
+
+        col_idx = 0
+        for i in range(out_h):
+            for j in range(out_w):
+                r = i * self.stride
+                c = j * self.stride
+                patch = input_padded[:, :, r:r+k_h, c:c+k_w]
+                col[:, :, col_idx] = patch.reshape(B, -1)
+                col_idx += 1
+
+        return col
+
+    # Forward completo: misma firma que _forward_direct
+    def _forward_im2col(self, input):
+        batch_size, _, in_h, in_w = input.shape
+        k_h = k_w = self.kernel_size
+
+        if self.padding > 0:
+            input = np.pad(input,
+                        ((0,0),(0,0),(self.padding,self.padding),(self.padding,self.padding)),
+                        mode='constant').astype(np.float32)
+
+        out_h = (input.shape[2] - k_h) // self.stride + 1
+        out_w = (input.shape[3] - k_w) // self.stride + 1
+
+        col = self._im2col(input, out_h, out_w)
+        # col: (B, C·kH·kW, out_h·out_w)
+
+        W = self.kernels.reshape(self.out_channels, -1)
+        # W: (out_channels, C·kH·kW)
+
+        out = W @ col
+        # out: (B, out_channels, out_h·out_w)
+
+        out = out.reshape(batch_size, self.out_channels, out_h, out_w)
+        out += self.biases[None, :, None, None]
+
+        return out
+    # ----- Generado con IA
+
 
     def _backward_direct(self, grad_output, learning_rate):
         batch_size, _, out_h, out_w = grad_output.shape
