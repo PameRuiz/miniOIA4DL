@@ -40,14 +40,20 @@ class Conv2D(Layer):
 
         # PISTA: Y estos valores para qué las podemos utilizar?
         # Si los usas, no olvides utilizar el modelo explicado en teoría que maximiza la caché
-        self.mc = 480
-        self.nc = 3072
-        self.kc = 384
-        self.mr = 32
-        self.nr = 12
+        #L1: 80 KB (por core)
+        #L2: 1.25 MB (por core)
+        #L3: 12 MB (compartido)
+        #Maximizar uso de L2 (1.25 MB) sin spillover
+        #Explotar L3 cache (12 MB) para datos no críticos
+        #Balance entre 8 cores sin contencion
+        # Optimizado para Intel i5-12450H (L2: 1.25MB, L3: 12MB, 8 cores)
+        self.mc = 384       # Bloques de filas (mejor para L2)
+        self.nc = 2048      # Bloques de columnas (aprovecha L3)
+        self.kc = 384       # Dimensión interna (evita conflictos)
+        self.mr = 32        # Micro-filas
+        self.nr = 24        # Micro-columnas (optimizado para 8 cores)
         self.Ac = np.empty((self.mc, self.kc), dtype=np.float32)
         self.Bc = np.empty((self.kc, self.nc), dtype=np.float32)
-
 
     def get_weights(self):
         return {'kernels': self.kernels, 'biases': self.biases}
