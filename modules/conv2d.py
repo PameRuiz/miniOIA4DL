@@ -18,7 +18,7 @@ class Conv2D(Layer):
         elif conv_algo == 1:
             self.mode = 'direct'
         else:
-            self.mode = 'direct' 
+            self.mode = 'im2col' 
 
         fan_in = in_channels * kernel_size * kernel_size
         fan_out = out_channels * kernel_size * kernel_size
