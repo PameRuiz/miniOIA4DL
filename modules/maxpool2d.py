@@ -37,7 +37,7 @@ class MaxPool2D(Layer):
 
         return output
     
-    ## ----- Generado con IA
+    ## ----- Generado con IA ---------------------------------
     def forward(self, input, training=True):
         self.input = input
         B, C, H, W = input.shape
@@ -78,9 +78,9 @@ class MaxPool2D(Layer):
         ], axis=-1)
     
         return output
-## ---------- Fin generado con IA
+## ---------- Fin generado con IA -------------------------
 
-    def backward_oirignal(self, grad_output, learning_rate=None):
+    def backward(self, grad_output, learning_rate=None):
         B, C, H, W = self.input.shape
         grad_input = np.zeros_like(self.input, dtype=grad_output.dtype)
         out_h, out_w = grad_output.shape[2], grad_output.shape[3]
@@ -93,24 +93,3 @@ class MaxPool2D(Layer):
                         grad_input[b, c, r, s] += grad_output[b, c, i, j]
 
         return grad_input
-    ## ----- Generado con IA
-    def backward(self, grad_output):
-        B, C, out_h, out_w = grad_output.shape
-        grad_input = np.zeros_like(self.input)
-
-        # 1. Creamos índices para las dimensiones Batch y Canal
-        # Usamos np.arange y broadcasting para que coincidan con la forma de grad_output
-        b_idx = np.arange(B).reshape(B, 1, 1, 1)
-        c_idx = np.arange(C).reshape(1, C, 1, 1)
-        
-        # 2. Extraemos las coordenadas r y s guardadas en el forward
-        # Asumiendo que max_indices tiene forma (B, C, out_h, out_w, 2)
-        r_idx = self.max_indices[:, :, :, :, 0]
-        s_idx = self.max_indices[:, :, :, :, 1]
-
-        # 3. Dispersión del gradiente (Scatter)
-        # NumPy permite usar arrays de índices para asignar valores en bloque
-        np.add.at(grad_input, (b_idx, c_idx, r_idx, s_idx), grad_output)
-
-        return grad_input
-    ## ---------- Fin generado con IA

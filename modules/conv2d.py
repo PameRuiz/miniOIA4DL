@@ -14,9 +14,9 @@ class Conv2D(Layer):
         
         # MODIFICAR: Añadir nuevo if-else para otros algoritmos de convolución
         if conv_algo == 0:
-            self.mode = 'direct' 
+            self.mode = 'im2col' 
         elif conv_algo == 1:
-            self.mode = 'im2col'
+            self.mode = 'direct'
         else:
             self.mode = 'direct' 
 
@@ -84,7 +84,6 @@ class Conv2D(Layer):
     def _forward_direct(self, input):
         batch_size, _, in_h, in_w = input.shape
         
-
         if self.padding > 0:
             input = np.pad(input,
                            ((0, 0), (0, 0), (self.padding, self.padding), (self.padding, self.padding)),
@@ -107,7 +106,7 @@ class Conv2D(Layer):
 
         return output
     
-    # ----- Generado con IA
+    # ----- Generado con IA --------------------------------
     # Función auxiliar: solo convierte input en matriz de parches
     def _im2col(self, input_padded, out_h, out_w):
         B, C, H, W = input_padded.shape
@@ -151,7 +150,7 @@ class Conv2D(Layer):
         out += self.biases[None, :, None, None]
 
         return out
-    # ----- Generado con IA
+    # ----- Fin Generado con IA ---------------------------
 
 
     def _backward_direct(self, grad_output, learning_rate):
