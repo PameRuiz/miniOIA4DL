@@ -18,7 +18,7 @@ class Conv2D(Layer):
         elif conv_algo == 1:
             self.mode = 'direct'
         else:
-            self.mode = 'im2col' 
+            self.mode = 'im2colfused' 
 
         fan_in = in_channels * kernel_size * kernel_size
         fan_out = out_channels * kernel_size * kernel_size
@@ -69,6 +69,8 @@ class Conv2D(Layer):
             return self._forward_direct(input)
         elif self.mode == 'im2col':   # ← añadir esto
             return self._forward_im2col(input) 
+        elif self.mode == 'im2colfused':  # ← añadir esto
+            return self._forward_im2col_fused(input)
         else:
             raise ValueError("Mode must be 'direct' or 'im2col'")
 
@@ -152,6 +154,46 @@ class Conv2D(Layer):
         return out
     # ----- Fin Generado con IA ---------------------------
 
+    def _forward_im2col_fused(self, input):
+        batch_size, _, in_h, in_w = input.shape
+        k_h = k_w = self.kernel_size
+
+        if self.padding > 0:
+            input = np.pad(
+                input,
+                ((0,0),(0,0),(self.padding,self.padding),(self.padding,self.padding)),
+                mode='constant'
+            ).astype(np.float32)
+
+        out_h = (input.shape[2] - k_h) // self.stride + 1
+        out_w = (input.shape[3] - k_w) // self.stride + 1
+
+        B, C, H_pad, W_pad = input.shape
+        s_b, s_c, s_h, s_w = input.strides
+
+        # Vista zero-copy de los parches: (B, C, out_h, out_w, kH, kW)
+        patches = np.lib.stride_tricks.as_strided(
+            input,
+            shape  = (B, C, out_h, out_w, k_h, k_w),
+            strides= (s_b, s_c,
+                    s_h * self.stride, s_w * self.stride,
+                    s_h, s_w)
+        )
+
+        # Reordenar a (B, out_h*out_w, C*kH*kW) y hacer contiguo para BLAS
+        col = patches.transpose(0, 2, 3, 1, 4, 5)           # (B, out_h, out_w, C, kH, kW)
+        col = np.ascontiguousarray(col)                       # forzar memoria contigua
+        col = col.reshape(B, out_h * out_w, C * k_h * k_w)  # (B, N, K)
+
+        W = self.kernels.reshape(self.out_channels, -1)      # (out_c, K)
+
+        # Batched matmul: (B, N, K) @ (K, out_c) → (B, N, out_c)
+        out = col @ W.T                                       # (B, N, out_c)
+        out = out.transpose(0, 2, 1)                          # (B, out_c, N)
+        out = out.reshape(B, self.out_channels, out_h, out_w)
+
+        out += self.biases[None, :, None, None]
+        return out
 
     def _backward_direct(self, grad_output, learning_rate):
         batch_size, _, out_h, out_w = grad_output.shape
