@@ -14,7 +14,7 @@ class Conv2D(Layer):
         
         # MODIFICAR: Añadir nuevo if-else para otros algoritmos de convolución
         if conv_algo == 0:
-            self.mode = 'im2col' 
+            self.mode = 'im2colfused' 
         elif conv_algo == 1:
             self.mode = 'direct'
         else:
